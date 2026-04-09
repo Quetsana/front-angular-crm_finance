@@ -46,12 +46,10 @@ jobs:
             cd /home/front-angular-crm-finance
 
             echo "--- 🔄 ACTUALIZANDO CÓDIGO ---"
-            export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa_front_angular -o StrictHostKeyChecking=no"
-
             if [ ! -d ".git" ]; then
                 cd ..
                 rm -rf front-angular-crm-finance
-                git clone git@github.com:${{ github.repository }}.git front-angular-crm-finance
+                git clone https://github.com/${{ github.repository }}.git front-angular-crm-finance
                 cd front-angular-crm-finance
             else
                 git fetch origin main
