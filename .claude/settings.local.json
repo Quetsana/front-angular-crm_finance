@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['projects']['front-angular-crm_finances']['architect']['build']['options'], indent=2\\)\\)\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\(JSON.stringify\\(j.projects['front-angular-crm_finances'].architect.build.options,null,2\\)\\)\")",
+      "Bash(npm run:*)",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}
