@@ -41,6 +41,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/finance/",
               "budgets": [
                 {
                   "type": "initial",
