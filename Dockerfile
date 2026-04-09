@@ -4,33 +4,42 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-
 RUN npm ci
 
 COPY . .
-
-ARG NODE_ENV=production
-ENV NODE_ENV=$NODE_ENV
-
-# Build Angular app
 RUN npm run build
 
-# Stage 2: Runtime - Serve static files with simple Node server
-FROM node:20-alpine
+# Stage 2: Runtime - Nginx
+FROM nginx:alpine
 
-WORKDIR /app
+# Copiar los archivos compilados
+COPY --from=builder /app/dist/front-angular-crm_finances/browser /usr/share/nginx/html
 
-RUN npm install -g http-server
+# Configurar nginx para SPA
+RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
+server {
+    listen 4200;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
 
-COPY --from=builder /app/dist/front-angular-crm_finances/browser ./public
+    # Caché de archivos estáticos
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 
-ENV NODE_ENV=production
-ENV HOST=0.0.0.0
+    # SPA fallback - servir index.html para cualquier ruta
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+EOF
+
 ENV PORT=4200
-
 EXPOSE 4200
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=15s \
   CMD wget -O- http://localhost:4200 || exit 1
 
-CMD ["http-server", "public", "-p", "4200", "-c-1", "--spa", "--gzip"]
+CMD ["nginx", "-g", "daemon off;"]
