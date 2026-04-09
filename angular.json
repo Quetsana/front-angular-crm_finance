@@ -42,6 +42,8 @@
           "configurations": {
             "production": {
               "baseHref": "/finance/",
+              "outputHashing": "all",
+              "prerender": false,
               "budgets": [
                 {
                   "type": "initial",
@@ -53,8 +55,7 @@
                   "maximumWarning": "4kB",
                   "maximumError": "8kB"
                 }
-              ],
-              "outputHashing": "all"
+              ]
             },
             "development": {
               "optimization": false,
