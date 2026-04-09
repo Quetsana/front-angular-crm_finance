@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  app-blue:
+    container_name: front-angular-crm-finance-blue
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    ports:
+      - "4201:4200"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4200
+    networks:
+      - frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "app.color=blue"
+
+  app-green:
+    container_name: front-angular-crm-finance-green
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    ports:
+      - "4202:4200"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4200
+    networks:
+      - frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "app.color=green"
+    profiles:
+      - standby
+
+networks:
+  frontend:
+    driver: bridge

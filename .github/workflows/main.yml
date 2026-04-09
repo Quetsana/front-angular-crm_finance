@@ -1,0 +1,131 @@
+name: CI/CD Front Angular CRM Finance
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  # ── JOB 1: Build ──────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  # ── JOB 2: Deploy (Blue-Green) ────────────────────────────────────────────────
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Blue-Green Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY_FRONT_ANGULAR }}
+          script: |
+            echo "--- 📂 PREPARANDO DIRECTORIO ---"
+            mkdir -p /home/front-angular-crm-finance
+            cd /home/front-angular-crm-finance
+
+            echo "--- 🔄 ACTUALIZANDO CÓDIGO ---"
+            export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519_front_angular -o StrictHostKeyChecking=no"
+
+            if [ ! -d ".git" ]; then
+                cd ..
+                rm -rf front-angular-crm-finance
+                git clone git@github.com:${{ github.repository }}.git front-angular-crm-finance
+                cd front-angular-crm-finance
+            else
+                git fetch origin main
+                git reset --hard origin/main
+            fi
+
+            echo "--- 🔐 VARIABLES DE ENTORNO ---"
+            cat > .env << 'ENVEOF'
+            APP_NAME=${{ secrets.APP_NAME }}
+            APP_VERSION=${{ secrets.APP_VERSION }}
+            NODE_ENV=production
+            HOST=0.0.0.0
+            PORT=4200
+            ENVEOF
+
+            echo "--- 🔵🟢 BLUE-GREEN DEPLOY ---"
+
+            # Detectar cuál está activo ahora
+            if docker ps --filter "name=front-angular-crm-finance-blue" --filter "status=running" -q | grep -q .; then
+                ACTIVE=blue
+                NEW=green
+                NEW_PORT=4202
+                ACTIVE_PORT=4201
+            else
+                ACTIVE=green
+                NEW=blue
+                NEW_PORT=4201
+                ACTIVE_PORT=4202
+            fi
+
+            echo "Activo: $ACTIVE ($ACTIVE_PORT) → Desplegando: $NEW ($NEW_PORT)"
+
+            # Construir y levantar el nuevo color
+            DOCKER_API_VERSION=1.41 docker compose up -d --build --no-deps app-$NEW
+
+            # Health check al nuevo color (30s máximo)
+            echo "🔍 Health check en puerto $NEW_PORT..."
+            SUCCESS=false
+            for i in $(seq 1 10); do
+                if curl -sf http://localhost:$NEW_PORT > /dev/null 2>&1; then
+                    echo "✅ Health check OK en intento $i"
+                    SUCCESS=true
+                    break
+                fi
+                echo "  Intento $i/10 fallido, esperando 3s..."
+                sleep 3
+            done
+
+            if [ "$SUCCESS" = false ]; then
+                echo "❌ Health check fallido — revirtiendo, $ACTIVE sigue activo"
+                docker compose stop app-$NEW
+                exit 1
+            fi
+
+            # Cambiar nginx al nuevo color (solo la línea marcada con ANGULAR_FRONTEND_UPSTREAM)
+            NGINX_CONF=$(grep -rl 'ANGULAR_FRONTEND_UPSTREAM' /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null | head -1)
+            if [ -n "$NGINX_CONF" ]; then
+                sed -i "s|proxy_pass http://localhost:$ACTIVE_PORT; # ANGULAR_FRONTEND_UPSTREAM|proxy_pass http://localhost:$NEW_PORT; # ANGULAR_FRONTEND_UPSTREAM|" "$NGINX_CONF"
+                nginx -t && nginx -s reload && echo "✅ Nginx apunta a $NEW ($NEW_PORT)"
+            else
+                echo "⚠️  No se encontró el bloque ANGULAR_FRONTEND_UPSTREAM en nginx"
+                echo "   Agrega el bloque / al nginx y asegúrate de incluir el comentario marcador"
+            fi
+
+            # Detener el color anterior
+            echo "🛑 Deteniendo $ACTIVE..."
+            DOCKER_API_VERSION=1.41 docker compose stop app-$ACTIVE
+
+            echo "--- 🧹 LIMPIEZA ---"
+            docker image prune -a -f
+            docker container prune -f
+            docker builder prune -f
+            docker network prune -f
+
+            echo "--- 📊 ESTADO FINAL ---"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "✅ BLUE-GREEN DEPLOY EXITOSO → $NEW activo en :$NEW_PORT"
