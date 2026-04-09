@@ -36,7 +36,6 @@
           },
           "configurations": {
             "production": {
-              "baseHref": "/finance/",
               "outputHashing": "all",
               "prerender": false,
               "budgets": [
