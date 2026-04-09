@@ -39,13 +39,14 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY_FRONT_ANGULAR }}
+          debug: true
           script: |
             echo "--- 📂 PREPARANDO DIRECTORIO ---"
             mkdir -p /home/front-angular-crm-finance
             cd /home/front-angular-crm-finance
 
             echo "--- 🔄 ACTUALIZANDO CÓDIGO ---"
-            export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519_front_angular -o StrictHostKeyChecking=no"
+            export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa_front_angular -o StrictHostKeyChecking=no"
 
             if [ ! -d ".git" ]; then
                 cd ..
