@@ -563,3 +563,73 @@ table.data-table tbody td {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+/* ─── Extra animations ───────────────────────────────────────────── */
+@keyframes bounceIn {
+  0%   { opacity: 0; transform: scale(.3); }
+  50%  { opacity: 1; transform: scale(1.05); }
+  70%  { transform: scale(.9); }
+  100% { transform: scale(1); }
+}
+@keyframes pulse-brand {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 21, 56, 0.5); }
+  50%       { box-shadow: 0 0 0 6px rgba(139, 21, 56, 0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ripple {
+  0%   { transform: scale(0); opacity: 1; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+.animate-bounce-in  { animation: bounceIn .4s cubic-bezier(.215,.61,.355,1) both; }
+.animate-slide-up   { animation: slideUp .35s ease both; }
+
+/* ─── Responsive charts ──────────────────────────────────────────── */
+/* Heights are handled per-component via .chart-h-lg / .chart-h-md classes */
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.chart-wrapper canvas {
+  display: block;
+  width: 100% !important;
+}
+
+/* ─── Global mobile overflow guard ──────────────────────────────── */
+@media (max-width: 1024px) {
+  /* Prevent any container from causing horizontal scroll */
+  .page, .card, .table-container {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  /* Tables scroll within their container only */
+  .table-container {
+    overflow-x: auto;
+  }
+}
+
+/* ─── Mobile toolbar wrap fix ────────────────────────────────────── */
+@media (max-width: 480px) {
+  .nav-actions { gap: 0.25rem; }
+}
+
+/* ─── Notification unread pulse ─────────────────────────────────── */
+.animate-pulse-brand { animation: pulse-brand 2s ease-in-out infinite; }
+
+/* ─── Smooth sidebar transitions ─────────────────────────────────── */
+.sidebar-link { position: relative; overflow: hidden; }
+.sidebar-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(201, 162, 39, 0.08);
+  opacity: 0;
+  transition: opacity .15s;
+  border-radius: inherit;
+}
+.sidebar-link:hover::after { opacity: 1; }
+.sidebar-link.active::after { display: none; }

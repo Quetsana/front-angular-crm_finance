@@ -13,9 +13,8 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { Chart, registerables } from 'chart.js';
 import { AnalysisService } from '../../../core/services/analysis.service';
-import { TransactionService } from '../../../core/services/transaction.service';
-import { ToastService } from '../../../core/services/toast.service';
 import { BreadcrumbComponent } from '../../../shared/components/breadcrumb.component';
+import { SkeletonComponent } from '../../../shared/components/skeleton.component';
 import { Analysis, AnalysisType } from '../../../core/models/analysis.model';
 
 Chart.register(...registerables);
@@ -23,7 +22,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-ai-analysis',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, DatePipe],
+  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, SkeletonComponent, DatePipe],
   template: `
     <div class="page animate-fade-in">
       <app-breadcrumb
@@ -38,32 +37,12 @@ Chart.register(...registerables);
           <h1 class="page-title">{{ 'aiAnalysis.title' | translate }}</h1>
           <p class="page-sub">{{ 'aiAnalysis.subtitle' | translate }}</p>
         </div>
-        <button class="btn btn-gold" (click)="generate()" [disabled]="generating()">
-          @if (generating()) {
-            <svg class="w-4 h-4 spin" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="3"
-                stroke-dasharray="60"
-                stroke-dashoffset="30"
-              />
-            </svg>
-            Generating...
-          } @else {
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            {{ 'aiAnalysis.generateNew' | translate }}
-          }
-        </button>
+        <div class="flex items-center gap-2">
+          <span class="ai-status-badge">
+            <span class="ai-status-dot"></span>
+            Auto-sync enabled
+          </span>
+        </div>
       </div>
 
       <!-- Type filter tabs -->
@@ -72,7 +51,7 @@ Chart.register(...registerables);
           <button
             class="type-tab"
             [class.active]="selectedType() === t.value"
-            (click)="selectedType.set(t.value)"
+            (click)="setActiveType(t.value)"
           >
             <span class="type-icon">{{ t.icon }}</span>
             <span>{{ t.label | translate }}</span>
@@ -81,7 +60,17 @@ Chart.register(...registerables);
         }
       </div>
 
+      <!-- Loading skeleton when switching tabs -->
+      @if (tabLoading()) {
+        <div class="card p-6 animate-fade-in">
+          <app-skeleton type="card"></app-skeleton>
+          <div class="mt-4"><app-skeleton type="line"></app-skeleton></div>
+          <div class="mt-2"><app-skeleton type="line"></app-skeleton></div>
+        </div>
+      }
+
       <!-- Selected analysis detail -->
+      @if (!tabLoading()) {
       @if (selectedAnalysis(); as a) {
         <div class="analysis-detail card animate-scale-in">
           <div class="detail-header">
@@ -200,6 +189,7 @@ Chart.register(...registerables);
             </div>
           </div>
         </div>
+      }
       }
 
       <!-- History list -->
@@ -581,42 +571,55 @@ Chart.register(...registerables);
         border-radius: 3px;
         transition: width 0.8s ease;
       }
+      .ai-status-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.875rem;
+        border-radius: 9999px;
+        background: rgba(74, 124, 89, 0.1);
+        border: 1px solid rgba(74, 124, 89, 0.25);
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #2d7a45;
+      }
+      html.dark .ai-status-badge { background: rgba(74,124,89,.15); color: #5fa86e; }
+      .ai-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4a7c59;
+        animation: pulse-green 2s ease-in-out infinite;
+      }
+      @keyframes pulse-green {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(74, 124, 89, 0.4); }
+        50% { box-shadow: 0 0 0 6px rgba(74, 124, 89, 0); }
+      }
+      .type-tabs { overflow-x: auto; padding-bottom: 2px; }
       @media (max-width: 640px) {
-        .insight-grid {
-          grid-template-columns: 1fr;
-        }
+        .insight-grid { grid-template-columns: 1fr; }
+        .type-tabs { flex-wrap: nowrap; }
+        .type-tab { white-space: nowrap; flex-shrink: 0; }
       }
     `,
   ],
 })
 export class AiAnalysisComponent implements AfterViewInit, OnDestroy {
   private analysisService = inject(AnalysisService);
-  private txService = inject(TransactionService);
-  private toast = inject(ToastService);
 
   @ViewChild('detailChart') detailChartRef?: ElementRef<HTMLCanvasElement>;
   private charts: Chart[] = [];
 
-  readonly generating = signal(false);
   readonly selectedType = signal<AnalysisType>('monthly');
-  readonly selectedAnalysis = signal<Analysis | null>(this.analysisService.getAll()[0] ?? null);
+  readonly selectedAnalysis = signal<Analysis | null>(
+    this.analysisService.getByType('monthly')[0] ?? null
+  );
+  readonly tabLoading = signal(false);
 
   readonly types = [
-    {
-      value: 'monthly' as AnalysisType,
-      label: 'aiAnalysis.monthly',
-      icon: 'M',
-    },
-    {
-      value: 'weekly' as AnalysisType,
-      label: 'aiAnalysis.weekly',
-      icon: 'W',
-    },
-    {
-      value: 'daily' as AnalysisType,
-      label: 'aiAnalysis.daily',
-      icon: 'D',
-    },
+    { value: 'monthly' as AnalysisType, label: 'aiAnalysis.monthly', icon: 'M' },
+    { value: 'weekly' as AnalysisType, label: 'aiAnalysis.weekly', icon: 'W' },
+    { value: 'daily' as AnalysisType, label: 'aiAnalysis.daily', icon: 'D' },
   ];
 
   readonly displayedAnalyses = computed(() => this.analysisService.getByType(this.selectedType()));
@@ -629,38 +632,24 @@ export class AiAnalysisComponent implements AfterViewInit, OnDestroy {
     setTimeout(() => this.renderDetailChart(), 100);
   }
 
+  /** Switch analysis type tab and auto-select first result */
+  setActiveType(type: AnalysisType): void {
+    if (this.selectedType() === type) return;
+    this.tabLoading.set(true);
+    this.selectedType.set(type);
+    this.destroyCharts();
+    setTimeout(() => {
+      const analyses = this.analysisService.getByType(type);
+      this.selectedAnalysis.set(analyses[0] ?? null);
+      this.tabLoading.set(false);
+      setTimeout(() => this.renderDetailChart(), 80);
+    }, 250);
+  }
+
   selectAnalysis(a: Analysis): void {
     this.selectedAnalysis.set(a);
     this.destroyCharts();
     setTimeout(() => this.renderDetailChart(), 50);
-  }
-
-  generate(): void {
-    this.generating.set(true);
-    setTimeout(() => {
-      const now = new Date();
-      const txns = this.txService.getByMonthYear(now.getMonth() + 1, now.getFullYear());
-      const s = this.txService.getSummary(txns);
-      const catEntries = Object.entries(s.byCategory);
-      const top = catEntries.sort((a, b) => b[1] - a[1])[0];
-      const metrics = {
-        totalRevenue: s.totalIncome,
-        totalCosts: s.totalExpenses,
-        netProfit: s.netBalance,
-        profitMargin: s.totalIncome ? (s.netBalance / s.totalIncome) * 100 : 0,
-        topCategory: top?.[0] ?? 'N/A',
-        topCategoryRevenue: top ? Math.abs(top[1]) : 0,
-        transactionCount: s.count,
-        avgTransactionValue: s.count ? s.totalIncome / s.count : 0,
-        categoryBreakdown: {} as Record<string, { revenue: number; costs: number; count: number }>,
-      };
-      const analysis = this.analysisService.generateAnalysis(this.selectedType(), metrics);
-      this.generating.set(false);
-      this.selectedAnalysis.set(analysis);
-      this.toast.success('Analysis generated', 'AI analysis is ready');
-      this.destroyCharts();
-      setTimeout(() => this.renderDetailChart(), 100);
-    }, 1800);
   }
 
   private renderDetailChart(): void {

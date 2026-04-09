@@ -1,15 +1,13 @@
-import { Component, inject, signal, output, input } from '@angular/core';
+import { Component, output, input } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
-import { AuthService } from '../../core/services/auth.service';
 import { TrustedHtmlPipe } from '../pipes/trusted-html.pipe';
 
 interface NavItem {
   labelKey: string;
   icon: string;
-  route?: string;
-  children?: NavItem[];
+  route: string;
   badge?: string;
 }
 
@@ -24,33 +22,11 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     labelKey: 'nav.transactions',
+    route: '/finance/transactions',
     icon: `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
       <path stroke-linecap="round" stroke-linejoin="round"
         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>`,
-    children: [
-      {
-        labelKey: 'common.income',
-        route: '/finance/transactions?type=income',
-        icon: `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
-        </svg>`,
-      },
-      {
-        labelKey: 'common.expense',
-        route: '/finance/transactions?type=expense',
-        icon: `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-        </svg>`,
-      },
-      {
-        labelKey: 'common.all',
-        route: '/finance/transactions',
-        icon: `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-        </svg>`,
-      },
-    ],
   },
   {
     labelKey: 'nav.accounts',
@@ -77,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   imports: [RouterLink, RouterLinkActive, CommonModule, TranslateModule, TrustedHtmlPipe],
   template: `
     <aside class="sidebar-shell" [class.collapsed]="collapsed()">
-      <!-- Top: Logo -->
+      <!-- Header: Logo -->
       <div class="sidebar-header">
         <div class="flex items-center gap-3 min-w-0">
           <img
@@ -92,7 +68,8 @@ const NAV_ITEMS: NavItem[] = [
             </div>
           }
         </div>
-        <button class="collapse-btn" (click)="toggleCollapsed()">
+        <!-- Desktop-only collapse toggle -->
+        <button class="collapse-btn desktop-only" (click)="collapsedChange.emit()" [title]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
           <svg
             class="w-4 h-4 transition-transform duration-300"
             [class.rotate-180]="collapsed()"
@@ -100,12 +77,7 @@ const NAV_ITEMS: NavItem[] = [
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
           </svg>
         </button>
       </div>
@@ -114,99 +86,24 @@ const NAV_ITEMS: NavItem[] = [
 
       <!-- Nav items -->
       <nav class="sidebar-nav">
-        @for (item of navItems; track item.labelKey) {
-          @if (item.children) {
-            <div class="nav-group">
-              <button
-                class="sidebar-link w-full"
-                [class.group-active]="isGroupActive(item)"
-                (click)="toggleGroup(item.labelKey)"
-              >
-                <span class="nav-icon" [innerHTML]="item.icon | trustedHtml"></span>
-                @if (!collapsed()) {
-                  <span class="flex-1 text-left">{{ item.labelKey | translate }}</span>
-                  <svg
-                    class="w-4 h-4 transition-transform duration-200 flex-shrink-0"
-                    [class.rotate-180]="openGroups().has(item.labelKey)"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                }
-              </button>
-
-              @if (!collapsed() && openGroups().has(item.labelKey)) {
-                <div class="sub-nav animate-slide-down">
-                  @for (child of item.children; track child.labelKey) {
-                    <a
-                      class="sidebar-link sub-link"
-                      [routerLink]="getRoute(child.route)"
-                      [queryParams]="getQueryParams(child.route)"
-                      routerLinkActive="active"
-                    >
-                      <span class="sub-icon" [innerHTML]="child.icon | trustedHtml"></span>
-                      <span>{{ child.labelKey | translate }}</span>
-                    </a>
-                  }
-                </div>
+        @for (item of navItems; track item.route) {
+          <a
+            class="sidebar-link"
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: false }"
+            (click)="linkClicked.emit()"
+          >
+            <span class="nav-icon" [innerHTML]="item.icon | trustedHtml"></span>
+            @if (!collapsed()) {
+              <span class="flex-1">{{ item.labelKey | translate }}</span>
+              @if (item.badge) {
+                <span class="ai-badge">{{ item.badge }}</span>
               }
-            </div>
-          } @else {
-            <a class="sidebar-link" [routerLink]="item.route" routerLinkActive="active">
-              <span class="nav-icon" [innerHTML]="item.icon | trustedHtml"></span>
-              @if (!collapsed()) {
-                <span class="flex-1">{{ item.labelKey | translate }}</span>
-                @if (item.badge) {
-                  <span class="ai-badge">{{ item.badge }}</span>
-                }
-              }
-            </a>
-          }
+            }
+          </a>
         }
       </nav>
-
-      <!-- Bottom: User -->
-      <div class="sidebar-footer">
-        <hr class="divider mx-3 opacity-20 mb-3" />
-        @if (auth.currentUser(); as user) {
-          <div class="user-section" [class.centered]="collapsed()">
-            <div class="user-avatar" [style.background]="user.avatarColor">
-              {{ user.avatarInitials }}
-            </div>
-            @if (!collapsed()) {
-              <div class="user-info min-w-0">
-                <div class="user-name">{{ user.firstName }} {{ user.lastName }}</div>
-                <div class="user-role">{{ user.role | titlecase }}</div>
-              </div>
-            }
-          </div>
-          <button class="sidebar-link w-full mt-1" (click)="auth.logout()">
-            <svg
-              class="w-4 h-4 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-            @if (!collapsed()) {
-              <span>{{ 'common.logout' | translate }}</span>
-            }
-          </button>
-        }
-      </div>
     </aside>
   `,
   styles: [
@@ -272,7 +169,8 @@ const NAV_ITEMS: NavItem[] = [
         transition: all 0.2s;
       }
       .collapse-btn:hover {
-        background: rgba(201, 162, 39, 0.2);
+        background: rgba(201, 162, 39, 0.25);
+        transform: scale(1.05);
       }
       .sidebar-nav {
         flex: 1;
@@ -283,6 +181,7 @@ const NAV_ITEMS: NavItem[] = [
         flex-direction: column;
         gap: 2px;
       }
+      .sidebar-nav::-webkit-scrollbar { width: 3px; }
       .nav-icon {
         width: 20px;
         height: 20px;
@@ -291,27 +190,7 @@ const NAV_ITEMS: NavItem[] = [
         align-items: center;
         justify-content: center;
       }
-      .nav-icon svg,
-      .sub-icon svg {
-        width: 100%;
-        height: 100%;
-      }
-      .sub-icon {
-        width: 16px;
-        height: 16px;
-        flex-shrink: 0;
-      }
-      .sub-nav {
-        padding-left: 1.75rem;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        margin-top: 2px;
-      }
-      .sub-link {
-        font-size: 0.8125rem;
-        padding: 0.45rem 0.75rem;
-      }
+      .nav-icon svg { width: 100%; height: 100%; }
       .ai-badge {
         font-size: 0.65rem;
         font-weight: 700;
@@ -320,103 +199,30 @@ const NAV_ITEMS: NavItem[] = [
         color: #1a0a12;
         border-radius: 9999px;
         letter-spacing: 0.05em;
+        animation: pulse-gold 2s ease-in-out infinite;
       }
-      .group-active {
-        background: rgba(201, 162, 39, 0.06) !important;
-      }
-      .sidebar-footer {
-        padding: 0.75rem;
-      }
-      .user-section {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.5rem 0.5rem;
-        border-radius: 10px;
-        background: rgba(201, 162, 39, 0.05);
-      }
-      .user-section.centered {
-        justify-content: center;
-      }
-      .user-avatar {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 0.75rem;
-        color: white;
-        flex-shrink: 0;
-      }
-      .user-info {
-        min-width: 0;
-        overflow: hidden;
-      }
-      .user-name {
-        font-size: 0.8125rem;
-        font-weight: 600;
-        color: #f5e8ee;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .user-role {
-        font-size: 0.7rem;
-        color: var(--accent);
-        text-transform: capitalize;
-      }
-      @media (max-width: 768px) {
+      /* Hide collapse button on tablet/mobile — sidebar is a drawer there */
+      @media (max-width: 1024px) {
+        .desktop-only { display: none !important; }
+        /* On tablet/mobile the layout parent (<app-sidebar>) handles
+           position:fixed + transform. sidebar-shell just fills it. */
         .sidebar-shell {
-          position: fixed;
-          left: 0;
-          top: 0;
-          z-index: 30;
+          position: relative;
+          width: 260px !important;
+          min-width: 260px !important;
+          height: 100%;
+        }
+        .sidebar-shell.collapsed {
+          width: 260px !important;
+          min-width: 260px !important;
         }
       }
     `,
   ],
 })
 export class SidebarComponent {
-  readonly auth = inject(AuthService);
   readonly collapsed = input(false);
+  readonly collapsedChange = output<void>();
+  readonly linkClicked = output<void>();
   readonly navItems = NAV_ITEMS;
-  readonly openGroups = signal<Set<string>>(new Set(['nav.transactions']));
-
-  toggleCollapsed(): void {}
-
-  toggleGroup(key: string): void {
-    this.openGroups.update((s) => {
-      const n = new Set(s);
-      n.has(key) ? n.delete(key) : n.add(key);
-      return n;
-    });
-  }
-
-  isGroupActive(item: { children?: { route?: string }[] }): boolean {
-    return (
-      item.children?.some(
-        (c) => c.route && window.location.pathname.startsWith(c.route.split('?')[0]),
-      ) ?? false
-    );
-  }
-
-  getRoute(route?: string): string {
-    if (!route) return '/';
-    return route.split('?')[0];
-  }
-
-  getQueryParams(route?: string): Record<string, string> | null {
-    if (!route || !route.includes('?')) return null;
-    const params: Record<string, string> = {};
-    route
-      .split('?')[1]
-      .split('&')
-      .forEach((p) => {
-        const [k, v] = p.split('=');
-        params[k] = v;
-      });
-    return params;
-  }
 }

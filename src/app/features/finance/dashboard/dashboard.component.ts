@@ -187,7 +187,7 @@ Chart.register(...registerables);
               <span class="badge badge-danger">Expenses</span>
             </div>
           </div>
-          <div class="chart-wrapper" style="height:280px">
+          <div class="chart-wrapper chart-h-lg">
             <canvas #lineChart></canvas>
           </div>
         </div>
@@ -200,7 +200,7 @@ Chart.register(...registerables);
               <p class="chart-sub">Revenue by category</p>
             </div>
           </div>
-          <div class="chart-wrapper" style="height:280px">
+          <div class="chart-wrapper chart-h-lg">
             <canvas #doughnutChart></canvas>
           </div>
         </div>
@@ -219,7 +219,7 @@ Chart.register(...registerables);
               {{ summary().netBalance >= 0 ? '▲ Positive' : '▼ Negative' }}
             </span>
           </div>
-          <div class="chart-wrapper" style="height:240px">
+          <div class="chart-wrapper chart-h-md">
             <canvas #barChart></canvas>
           </div>
         </div>
@@ -493,15 +493,22 @@ Chart.register(...registerables);
         font-variant-numeric: tabular-nums;
       }
 
+      /* Responsive chart heights */
+      .chart-h-lg { height: 280px; }
+      .chart-h-md { height: 240px; }
+
       @media (max-width: 1024px) {
-        .charts-grid-2 {
-          grid-template-columns: 1fr;
-        }
+        .charts-grid-2 { grid-template-columns: 1fr; }
+        .chart-h-lg { height: 240px; }
+        .chart-h-md { height: 200px; }
       }
       @media (max-width: 640px) {
-        .metric-value {
-          font-size: 1.4rem;
-        }
+        .metric-value { font-size: 1.4rem; }
+        .chart-h-lg { height: 200px; }
+        .chart-h-md { height: 180px; }
+        .chart-card { padding: 0.875rem; }
+        .cat-info { min-width: 90px; }
+        .cat-amount { min-width: 55px; font-size: 0.75rem; }
       }
     `,
   ],
