@@ -41,13 +41,19 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             echo "--- 📂 PREPARANDO DIRECTORIO ---"
-            mkdir -p /home/front-angular-crm-finance
-            cd /home/front-angular-crm-finance
+            DEPLOY_DIR="/home/front-angular-crm-finance"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
             echo "--- 🔄 ACTUALIZANDO CÓDIGO ---"
             if [ ! -d ".git" ]; then
-                git clone https://github.com/${{ github.repository }}.git .
+                echo "Clonando repositorio..."
+                git clone --depth 1 https://github.com/${{ github.repository }}.git temp
+                mv temp/* .
+                mv temp/.* . 2>/dev/null || true
+                rm -rf temp
             else
+                echo "Actualizando repositorio existente..."
                 git fetch origin main
                 git reset --hard origin/main
             fi
@@ -61,19 +67,30 @@ jobs:
             PORT=4200
             ENVEOF
 
+            echo "--- 📋 VERIFICANDO ARCHIVOS ---"
+            ls -la | head -20
+
             echo "--- 🐳 DESPLEGANDO CON DOCKER ---"
-            DOCKER_API_VERSION=1.41 docker compose down
+            DOCKER_API_VERSION=1.41 docker compose down || true
             DOCKER_API_VERSION=1.41 docker compose up -d --build
 
             echo "--- ⏳ ESPERANDO QUE LA APP ESTÉ LISTA ---"
+            SUCCESS=false
             for i in $(seq 1 20); do
                 if curl -sf http://localhost:4200 > /dev/null 2>&1; then
                     echo "✅ App funcionando en intento $i"
+                    SUCCESS=true
                     break
                 fi
                 echo "  Intento $i/20, esperando 3s..."
                 sleep 3
             done
+
+            if [ "$SUCCESS" = false ]; then
+                echo "❌ App no respondió, mostrando logs..."
+                docker compose logs
+                exit 1
+            fi
 
             echo "--- 🧹 LIMPIEZA ---"
             docker image prune -a -f
