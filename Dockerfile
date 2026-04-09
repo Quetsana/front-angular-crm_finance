@@ -2,39 +2,35 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci
-
 COPY . .
 RUN npm run build
 
 # Stage 2: Runtime - Nginx
 FROM nginx:alpine
 
-# Copiar los archivos compilados
 COPY --from=builder /app/dist/front-angular-crm_finances/browser /usr/share/nginx/html
 
-# Configurar nginx para SPA
-RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
-server {
-    listen 4200;
-    server_name localhost;
-    root /usr/share/nginx/html;
-    index index.html;
+# Remover configuración por defecto
+RUN rm /etc/nginx/conf.d/default.conf
 
-    # Caché de archivos estáticos
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # SPA fallback - servir index.html para cualquier ruta
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
-EOF
+# Agregar configuración para SPA
+RUN echo 'server {\n\
+    listen 4200;\n\
+    server_name localhost;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, immutable";\n\
+    }\n\
+\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}' > /etc/nginx/conf.d/default.conf
 
 ENV PORT=4200
 EXPOSE 4200
